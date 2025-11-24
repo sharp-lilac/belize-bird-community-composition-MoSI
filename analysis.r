@@ -137,7 +137,7 @@ fig_rank <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)) +
     theme_light() +
     guides(color = guide_legend(override.aes = list(linewidth = 1))) +
     scale_color_manual(values = c("green3", "purple3", "orange2", "skyblue2", "hotpink3", "#008080"))
-ggsave("fig_rank.jpg", fig_rank, width = 8, height = 6)
+ggsave("outputs/fig_rank.jpg", fig_rank, width = 8, height = 6)
 fig_rank_log <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)) +
     geom_line(linewidth = 0.7, alpha = 0.8) +
     geom_point(size = 0.7, alpha = 0.8) +
