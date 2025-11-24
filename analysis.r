@@ -5,7 +5,7 @@ source("helper_scripts/data_load.r")
 source("helper_scripts/theme.r")
 
 # Create abundance dataframe ----------------------------------
-unique_net_opens <- df_effort %>%
+df_unique_net_opens <- df_effort %>%
     select(Station, NetNum = `Net #`, Year, Month, Day) %>%
     distinct()
 df_counts <- df %>%
@@ -14,7 +14,7 @@ df_counts <- df %>%
     group_by(Year, Month, Day, Station, NetNum) %>%
     summarise(Count = n()) %>%
     na.omit() %>%
-    right_join(unique_net_opens, by = c("Station", "NetNum", "Year", "Month", "Day")) %>%
+    right_join(df_unique_net_opens, by = c("Station", "NetNum", "Year", "Month", "Day")) %>%
     mutate(Count = replace_na(Count, 0))
 df_effort_time <- df_effort %>%
     mutate(NetNum = `Net #`) %>%
@@ -87,14 +87,14 @@ fig_shannon <- ggplot(df_shannon, aes(x = Date, y = Shannon)) +
     facet_wrap(~Station) +
     labs(y = "Shannon Diversity Index") +
     theme_light()
-ggsave("fig_shannon.jpg", fig_shannon, width = 8, height = 6)
+ggsave("outputs/fig_shannon.jpg", fig_shannon, width = 8, height = 6)
 fig_richness <- ggplot(df_shannon_long, aes(x = Date, y = Value, color = Index)) +
     geom_smooth(method = "lm") +
     labs(y = "Species Count per 50 Net Hours") +
     facet_wrap(~Station) +
     theme_light() +
     scale_color_manual(values = c("green3", "purple3"))
-ggsave("fig_richness.jpg", fig_richness, width = 9, height = 6)
+ggsave("outputs/fig_richness.jpg", fig_richness, width = 9, height = 6)
 
 # Create dominance dataframe ----------------------------------
 df_rank_all <- df_species %>%
@@ -109,7 +109,7 @@ df_rank_all <- df_species %>%
     mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL", "CT"), ordered = TRUE))
 
 # Create dominance table ----------------------------------
-top5_table <- df_rank_all %>%
+table_rank_top5 <- df_rank_all %>%
     filter(Rank <= 5) %>%
     mutate(
         RelAbund_fmt = sprintf("%.1f%%", RelAbund * 100),
@@ -127,7 +127,7 @@ top5_table <- df_rank_all %>%
             summarise(`Total Ranks` = max(Rank, na.rm = TRUE)),
         by = "Station"
     )
-write.csv(top5_table, "table_ranks.csv")
+write.csv(table_rank_top5, "outputs/table_ranks.csv")
 
 # Create dominance figures ----------------------------------
 fig_rank <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)) +
@@ -154,95 +154,95 @@ fig_rank_log <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)
         panel.grid.major.y = element_line(color = "grey40", linewidth = 0.5),
         panel.grid.minor.y = element_line(color = "grey80", linewidth = 0.3)
     )
-ggsave("fig_rank_log.jpg", fig_rank_log, width = 8, height = 6)
+ggsave("outputs/fig_rank_log.jpg", fig_rank_log, width = 8, height = 6)
 
 # Create iNEXT object ----------------------------------
 df_clean <- df %>%
     filter(!is.na(`Species Code`), !Code %in% c("R", "U")) %>%
     group_by(Station, `Species Code`) %>%
     summarise(count = n(), .groups = "drop")
-abundance_list <- df_clean %>%
+list_abundance <- df_clean %>%
     group_split(Station) %>%
     setNames(unique(df_clean$Station)) %>%
     lapply(function(x) x$count)
-inext_all <- iNEXT(abundance_list, q = 0, datatype = "abundance")
-inext_all_gg <- fortify(inext_all, type = 1)
-station_order <- c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL", "CT")
-inext_all_gg$Assemblage <- factor(inext_all_gg$Assemblage, levels = station_order, ordered = TRUE)
-transition_points <- inext_all_gg %>%
+list_inext_all <- iNEXT(list_abundance, q = 0, datatype = "abundance")
+df_inext_all <- fortify(list_inext_all, type = 1)
+vector_station_order <- c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL", "CT")
+df_inext_all$Assemblage <- factor(df_inext_all$Assemblage, levels = vector_station_order, ordered = TRUE)
+df_transition_points <- df_inext_all %>%
     filter(Method == "Extrapolation") %>%
     group_by(Assemblage) %>%
     slice(1) %>%
     ungroup()
 
 # Create rarefaction figure ----------------------------------
-fig_rarefaction <- ggplot(inext_all_gg, aes(x = x, y = y, color = Assemblage)) +
+fig_rarefaction <- ggplot(df_inext_all, aes(x = x, y = y, color = Assemblage)) +
     geom_line() +
     geom_ribbon(aes(ymin = y.lwr, ymax = y.upr, fill = Assemblage), alpha = 0.2) +
-    geom_point(data = transition_points, aes(x = x, y = y), shape = 8, size = 5, color = "black") +
+    geom_point(data = df_transition_points, aes(x = x, y = y), shape = 8, size = 5, color = "black") +
     labs(x = "Number of Individuals", y = "Species Richness") +
     theme_classic() +
     scale_color_manual(values = c("green3", "purple3", "orange2", "skyblue2", "hotpink3", "#008080")) +
     scale_fill_manual(values = c("green3", "purple3", "orange2", "skyblue2", "hotpink3", "#008080"))
-ggsave("fig_rarefaction.jpg", fig_rarefaction, width = 8, height = 6)
+ggsave("outputs/fig_rarefaction.jpg", fig_rarefaction, width = 8, height = 6)
 
 # Create species matrices ----------------------------------
-species_matrix1 <- df_species %>%
+df_species_matrix <- df_species %>%
     group_by(Station, `Species Code`) %>%
     summarise(Total = sum(Count_Stand, na.rm = TRUE), .groups = "drop") %>%
     pivot_wider(names_from = `Species Code`, values_from = Total, values_fill = 0) %>%
     column_to_rownames(var = c("Station"))
-species_long <- species_matrix1 %>%
+df_species_matrix_long <- df_species_matrix %>%
     as.data.frame() %>%
     rownames_to_column(var = "Station") %>%
     pivot_longer(-Station, names_to = "Species", values_to = "Abundance")
-species_matrix <- df_species %>%
+df_species_matrix_alternate <- df_species %>%
     filter(`Species Code` != "BADE" & `Species Code` != "BALO") %>%
     group_by(Station, Season, `Species Code`) %>%
     summarise(Total = sum(Count_Stand, na.rm = TRUE), .groups = "drop") %>%
     pivot_wider(names_from = `Species Code`, values_from = Total, values_fill = 0)
-site_info <- species_matrix %>%
+df_site_info <- df_species_matrix_alternate %>%
     select(Station, Season)
-comm_matrix <- species_matrix %>%
+matrix_community <- df_species_matrix_alternate %>%
     select(-Station, -Season) %>%
     as.matrix()
-rownames(comm_matrix) <- site_info$Station
+rownames(matrix_community) <- df_site_info$Station
 
 # Create exclusive species table ----------------------------------
-exclusive_species <- species_long %>%
+table_exclusive_species <- df_species_matrix_long %>%
     filter(Abundance > 0) %>%
     group_by(Species) %>%
     filter(n() == 1) %>%
     ungroup() %>%
     group_by(Station) %>%
     summarise(`Exclusive Species` = paste(Species, collapse = ", "))
-write.csv(exclusive_species, "table_exclusive_species.csv")
+write.csv(table_exclusive_species, "outputs/table_exclusive_species.csv")
 
 # Run NMDS ----------------------------------
-nmds <- metaMDS(comm_matrix, distance = "bray", k = 2, trymax = 100)
-nmds_sites <- as.data.frame(scores(nmds, display = "sites"))
-nmds_sites$Station <- site_info$Station
-nmds_sites$Season <- site_info$Season
-nmds_species <- as.data.frame(scores(nmds, display = "species"))
-nmds_species$species <- rownames(nmds_species)
-nmds$stress
+mds_nmds <- metaMDS(matrix_community, distance = "bray", k = 2, trymax = 100)
+df_nmds_sites <- as.data.frame(scores(mds_nmds, display = "sites"))
+df_nmds_sites$Station <- df_site_info$Station
+df_nmds_sites$Season <- df_site_info$Season
+df_nmds_species <- as.data.frame(scores(mds_nmds, display = "species"))
+df_nmds_species$species <- rownames(df_nmds_species)
+mds_nmds$stress
 
 # Create NMDS centroid means table ----------------------------------
-nmds_sites_label <- nmds_sites %>%
+df_nmds_sites_label <- df_nmds_sites %>%
     group_by(Station) %>%
     summarise(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
-write.csv(nmds_sites_label, "table_centroid_means.csv")
+write.csv(df_nmds_sites_label, "outputs/table_centroid_means.csv")
 
 # Create NMDS figure ----------------------------------
-fig_nmds <- ggplot(nmds_sites, aes(x = NMDS1, y = NMDS2, color = Station)) +
+fig_nmds <- ggplot(df_nmds_sites, aes(x = NMDS1, y = NMDS2, color = Station)) +
     geom_point(size = 3) +
     stat_ellipse(aes(group = Station), linetype = 2) +
     geom_text(
-        data = nmds_sites_label, aes(x = NMDS1, y = NMDS2, label = Station),
+        data = df_nmds_sites_label, aes(x = NMDS1, y = NMDS2, label = Station),
         inherit.aes = FALSE, size = 4, fontface = "bold"
     ) +
     geom_text(
-        data = nmds_species, aes(x = NMDS1, y = NMDS2, label = species),
+        data = df_nmds_species, aes(x = NMDS1, y = NMDS2, label = species),
         inherit.aes = FALSE, color = "black", alpha = 0.5, size = 1.8
     ) +
     theme_bw() +
@@ -250,4 +250,4 @@ fig_nmds <- ggplot(nmds_sites, aes(x = NMDS1, y = NMDS2, color = Station)) +
     scale_y_continuous(breaks = seq(-1.5, 1.5, by = 0.5)) +
     coord_equal() +
     labs(x = "NMDS1", y = "NMDS2")
-ggsave("fig_nmds.jpg", fig_nmds, width = 8, height = 9)
+ggsave("outputs/fig_nmds.jpg", fig_nmds, width = 8, height = 9)
