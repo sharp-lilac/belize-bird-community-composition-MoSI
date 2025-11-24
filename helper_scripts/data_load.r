@@ -1,4 +1,4 @@
-# data_prepare.r
+# data_load.r
 
 ## Source code ------------------------
 source("helper_scripts/packages_attach.r")
