@@ -83,7 +83,7 @@ df_shannon_long <- df_shannon %>%
 # Create diversity figures ----------------------------------
 fig_shannon <- ggplot(df_shannon, aes(x = Date, y = Shannon)) +
     geom_point() +
-    geom_smooth(method = "lm", color = "purple3") +
+    geom_smooth(method = "lm", color = palette[2]) +
     facet_wrap(~Station) +
     labs(y = "Shannon Diversity Index") +
     theme_light()
@@ -93,7 +93,7 @@ fig_richness <- ggplot(df_shannon_long, aes(x = Date, y = Value, color = Index))
     labs(y = "Species Count per 50 Net Hours") +
     facet_wrap(~Station) +
     theme_light() +
-    scale_color_manual(values = c("green3", "purple3"))
+    scale_color_manual(values = palette)
 ggsave("outputs/fig_richness.jpg", fig_richness, width = 9, height = 6)
 
 # Create dominance dataframe ----------------------------------
@@ -136,7 +136,7 @@ fig_rank <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)) +
     labs(x = "Species Rank", y = "Relative Abundance") +
     theme_light() +
     guides(color = guide_legend(override.aes = list(linewidth = 1))) +
-    scale_color_manual(values = c("green3", "purple3", "orange2", "skyblue2", "hotpink3", "#008080"))
+    scale_color_manual(values = palette)
 ggsave("outputs/fig_rank.jpg", fig_rank, width = 8, height = 6)
 fig_rank_log <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)) +
     geom_line(linewidth = 0.7, alpha = 0.8) +
@@ -149,7 +149,7 @@ fig_rank_log <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)
     labs(x = "Species Rank", y = "Relative Abundance (log10)") +
     theme_light() +
     guides(color = guide_legend(override.aes = list(linewidth = 1))) +
-    scale_color_manual(values = c("green3", "purple3", "orange2", "skyblue2", "hotpink3", "#008080")) +
+    scale_color_manual(values = palette) +
     theme(
         panel.grid.major.y = element_line(color = "grey40", linewidth = 0.5),
         panel.grid.minor.y = element_line(color = "grey80", linewidth = 0.3)
@@ -182,8 +182,8 @@ fig_rarefaction <- ggplot(df_inext_all, aes(x = x, y = y, color = Assemblage)) +
     geom_point(data = df_transition_points, aes(x = x, y = y), shape = 8, size = 5, color = "black") +
     labs(x = "Number of Individuals", y = "Species Richness") +
     theme_classic() +
-    scale_color_manual(values = c("green3", "purple3", "orange2", "skyblue2", "hotpink3", "#008080")) +
-    scale_fill_manual(values = c("green3", "purple3", "orange2", "skyblue2", "hotpink3", "#008080"))
+    scale_color_manual(values = palette) +
+    scale_fill_manual(values = palette)
 ggsave("outputs/fig_rarefaction.jpg", fig_rarefaction, width = 8, height = 6)
 
 # Create species matrices ----------------------------------
