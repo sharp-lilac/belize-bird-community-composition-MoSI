@@ -251,3 +251,4 @@ fig_nmds <- ggplot(df_nmds_sites, aes(x = NMDS1, y = NMDS2, color = Station)) +
     coord_equal() +
     labs(x = "NMDS1", y = "NMDS2")
 ggsave("outputs/fig_nmds.jpg", fig_nmds, width = 8, height = 9)
+ggsave("outputs/fig_nmds_wide.jpg", fig_nmds, width = 12, height = 9)
