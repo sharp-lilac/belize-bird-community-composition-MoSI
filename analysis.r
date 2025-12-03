@@ -252,3 +252,19 @@ fig_nmds <- ggplot(df_nmds_sites, aes(x = NMDS1, y = NMDS2, color = Station)) +
     labs(x = "NMDS1", y = "NMDS2")
 ggsave("outputs/fig_nmds.jpg", fig_nmds, width = 8, height = 9)
 ggsave("outputs/fig_nmds_wide.jpg", fig_nmds, width = 14, height = 6)
+
+# Run PERMANOVA ----------------------------------
+df_site_info$Station <- as.factor(df_site_info$Station)
+df_site_info$Season <- as.factor(df_site_info$Season)
+permanova_community <- adonis2(
+    matrix_community ~ Station + Season,
+    data = df_site_info,
+    method = "bray",
+    permutations = 999
+)
+permanova_community
+bd_station <- betadisper(
+    vegdist(matrix_community, method = "bray"),
+    df_site_info$Station
+)
+permutest(bd_station)
