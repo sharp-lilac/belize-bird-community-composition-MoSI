@@ -17,9 +17,3 @@ find_data_file <- function(pattern) {
 }
 df <- read_excel(find_data_file("^MoSI_Bird Banding Database.*\\.xlsx$"))
 df_effort <- read_excel(find_data_file("^MoSI_Bird Banding Effort.*\\.xlsx$"))
-
-## Filter out TREEs ------------------------
-df <- df %>%
-    filter(Station != "CT")
-df_effort <- df_effort %>%
-    filter(Station != "CT")
