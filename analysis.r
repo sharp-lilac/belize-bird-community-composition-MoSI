@@ -40,7 +40,7 @@ df_abun_effort <- df_counts %>%
         Count_Stand = Count / Effort * 50
     ) %>%
     filter(Effort > 10) %>%
-    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL", "CT"), ordered = TRUE))
+    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL"), ordered = TRUE))
 
 # Create abundance figure ----------------------------------
 fig_abun <- ggplot(df_abun_effort, aes(x = Season, y = Count_Stand)) +
@@ -49,7 +49,7 @@ fig_abun <- ggplot(df_abun_effort, aes(x = Season, y = Count_Stand)) +
     facet_wrap(~Station) +
     theme_light() +
     labs(y = "Count per 50 Net Hours") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ggsave("outputs/fig_abun.jpg", fig_abun, width = 8, height = 6)
 
 # Create diversity dataframes ----------------------------------
@@ -75,7 +75,7 @@ df_shannon <- df_species %>%
         Effective = exp(Shannon),
         .groups = "drop"
     ) %>%
-    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL", "CT"), ordered = TRUE))
+    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL"), ordered = TRUE))
 df_shannon_long <- df_shannon %>%
     pivot_longer(cols = c("Shannon", "Richness", "Effective"), names_to = "Index", values_to = "Value") %>%
     filter(Index != "Shannon")
@@ -106,7 +106,7 @@ df_rank_all <- df_species %>%
         Rank = row_number(),
         RelAbund = Count / sum(Count)
     ) %>%
-    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL", "CT"), ordered = TRUE))
+    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL"), ordered = TRUE))
 
 # Create dominance table ----------------------------------
 table_rank_top5 <- df_rank_all %>%
@@ -167,7 +167,7 @@ list_abundance <- df_clean %>%
     lapply(function(x) x$count)
 list_inext_all <- iNEXT(list_abundance, q = 0, datatype = "abundance")
 df_inext_all <- fortify(list_inext_all, type = 1)
-vector_station_order <- c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL", "CT")
+vector_station_order <- c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL")
 df_inext_all$Assemblage <- factor(df_inext_all$Assemblage, levels = vector_station_order, ordered = TRUE)
 df_transition_points <- df_inext_all %>%
     filter(Method == "Extrapolation") %>%
