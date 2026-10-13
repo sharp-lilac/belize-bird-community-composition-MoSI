@@ -4,6 +4,19 @@
 source("helper_scripts/data_load.r")
 source("helper_scripts/theme.r")
 
+## Set seed ------------------------
+set.seed(2025)
+
+## Define helper function ------------------------
+drop_na_report <- function(x, label) {
+    n_before <- nrow(x)
+    x <- tidyr::drop_na(x)
+    if (nrow(x) < n_before) {
+        message(label, ": dropped ", n_before - nrow(x), " of ", n_before, " rows with missing values")
+    }
+    x
+}
+
 # Create abundance dataframe ----------------------------------
 df_unique_net_opens <- df_effort %>%
     select(Station, NetNum = `Net #`, Year, Month, Day) %>%
@@ -12,40 +25,39 @@ df_counts <- df %>%
     filter(Code != "R" & Code != "U") %>%
     mutate(Year = as.integer(YYYY), NetNum = as.integer(`Net #`), Month = as.integer(MM), Day = as.integer(DD)) %>%
     group_by(Year, Month, Day, Station, NetNum) %>%
-    summarise(Count = n()) %>%
-    na.omit() %>%
+    summarise(Count = n(), .groups = "drop") %>%
+    drop_na_report("df_counts") %>%
     right_join(df_unique_net_opens, by = c("Station", "NetNum", "Year", "Month", "Day")) %>%
     mutate(Count = replace_na(Count, 0))
 df_effort_time <- df_effort %>%
     mutate(NetNum = `Net #`) %>%
     mutate(
-        TimeOpened_str = sprintf("%04d", TimeOpened),
-        TimeClosed_str = sprintf("%04d", TimeClosed),
+        TimeOpened_str = if_else(is.na(TimeOpened), NA_character_, sprintf("%04d", as.integer(TimeOpened))),
+        TimeClosed_str = if_else(is.na(TimeClosed), NA_character_, sprintf("%04d", as.integer(TimeClosed))),
         TimeOpened_parsed = hm(paste0(substr(TimeOpened_str, 1, 2), ":", substr(TimeOpened_str, 3, 4))),
         TimeClosed_parsed = hm(paste0(substr(TimeClosed_str, 1, 2), ":", substr(TimeClosed_str, 3, 4))),
         TimeOpen = as.numeric(TimeClosed_parsed - TimeOpened_parsed, "hours")
     ) %>%
     select(Year, Month, Day, Station, NetNum, TimeOpen) %>%
     group_by(Year, Month, Day, Station, NetNum) %>%
-    summarise(Effort = sum(TimeOpen)) %>%
-    na.omit()
+    summarise(Effort = sum(TimeOpen), .groups = "drop") %>%
+    drop_na_report("df_effort_time")
 df_abun_effort <- df_counts %>%
     left_join(df_effort_time, by = c("Year", "Month", "Day", "Station", "NetNum")) %>%
     group_by(Year, Month, Day, Station) %>%
-    summarise(Effort = sum(Effort, na.rm = TRUE), Count = sum(Count, na.rm = TRUE), Nets = n_distinct(NetNum)) %>%
-    ungroup() %>%
+    summarise(Effort = sum(Effort, na.rm = TRUE), Count = sum(Count, na.rm = TRUE), Nets = n_distinct(NetNum), .groups = "drop") %>%
     mutate(
         Date = as.Date(paste(Year, Month, Day, sep = "-"), format = "%Y-%m-%d"),
         Season = if_else(Month %in% c(11, 12), paste0(Year, "-", Year + 1), paste0(Year - 1, "-", Year)),
         Count_Stand = Count / Effort * 50
     ) %>%
     filter(Effort > 10) %>%
-    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL"), ordered = TRUE))
+    mutate(Station = factor(Station, levels = station_levels, ordered = TRUE))
 
 # Create abundance figure ----------------------------------
 fig_abun <- ggplot(df_abun_effort, aes(x = Season, y = Count_Stand)) +
     geom_boxplot() +
-    stat_summary(fun.y = "mean", shape = 2) +
+    stat_summary(fun = "mean", shape = 2) +
     facet_wrap(~Station) +
     theme_light() +
     labs(y = "Count per 50 Net Hours") +
@@ -58,14 +70,17 @@ df_species <- df %>%
     filter(`Species Code` != "BADE" & `Species Code` != "BALO") %>%
     mutate(Year = as.integer(YYYY), NetNum = as.integer(`Net #`), Month = as.integer(MM), Day = as.integer(DD)) %>%
     group_by(Year, Month, Day, Station, `Species Code`) %>%
-    summarise(Count = n()) %>%
-    na.omit() %>%
+    summarise(Count = n(), .groups = "drop") %>%
+    drop_na_report("df_species") %>%
     mutate(
         Date = as.Date(paste(Year, Month, Day, sep = "-"), format = "%Y-%m-%d"),
         Season = if_else(Month %in% c(11, 12), paste0(Year, "-", Year + 1), paste0(Year - 1, "-", Year))
     ) %>%
     select(Station, Date, Season, `Species Code`, Count) %>%
-    left_join(df_abun_effort %>% select(Station, Date, Effort), by = c("Station", "Date")) %>%
+    inner_join(
+        df_abun_effort %>% mutate(Station = as.character(Station)) %>% select(Station, Date, Effort),
+        by = c("Station", "Date")
+    ) %>%
     mutate(Count_Stand = Count / Effort * 50)
 df_shannon <- df_species %>%
     group_by(Station, Date, Season) %>%
@@ -75,7 +90,7 @@ df_shannon <- df_species %>%
         Effective = exp(Shannon),
         .groups = "drop"
     ) %>%
-    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL"), ordered = TRUE))
+    mutate(Station = factor(Station, levels = station_levels, ordered = TRUE))
 df_shannon_long <- df_shannon %>%
     pivot_longer(cols = c("Shannon", "Richness", "Effective"), names_to = "Index", values_to = "Value") %>%
     filter(Index != "Shannon")
@@ -90,7 +105,7 @@ fig_shannon <- ggplot(df_shannon, aes(x = Date, y = Shannon)) +
 ggsave("outputs/fig_shannon.jpg", fig_shannon, width = 8, height = 6)
 fig_richness <- ggplot(df_shannon_long, aes(x = Date, y = Value, color = Index)) +
     geom_smooth(method = "lm") +
-    labs(y = "Species Count per 50 Net Hours") +
+    labs(y = "Richness / Effective Species (from counts per 50 Net Hours)") +
     facet_wrap(~Station) +
     theme_light() +
     scale_color_manual(values = palette)
@@ -106,7 +121,7 @@ df_rank_all <- df_species %>%
         Rank = row_number(),
         RelAbund = Count / sum(Count)
     ) %>%
-    mutate(Station = factor(Station, levels = c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL"), ordered = TRUE))
+    mutate(Station = factor(Station, levels = station_levels, ordered = TRUE))
 
 # Create dominance table ----------------------------------
 table_rank_top5 <- df_rank_all %>%
@@ -127,7 +142,7 @@ table_rank_top5 <- df_rank_all %>%
             summarise(`Total Ranks` = max(Rank, na.rm = TRUE)),
         by = "Station"
     )
-write.csv(table_rank_top5, "outputs/table_ranks.csv")
+write.csv(table_rank_top5, "outputs/table_ranks.csv", row.names = FALSE)
 
 # Create dominance figures ----------------------------------
 fig_rank <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)) +
@@ -143,7 +158,7 @@ fig_rank_log <- ggplot(df_rank_all, aes(x = Rank, y = RelAbund, color = Station)
     geom_point(size = 0.7, alpha = 0.8) +
     scale_y_log10(
         breaks = 10^(-4:0),
-        minor_breaks = rep(1:9, each = 5) * 10^rep(-4:0, times = 9),
+        minor_breaks = rep(1:9, each = 5) * 10^rep(-4:0, times = 9)
     ) +
     scale_x_continuous(breaks = seq(0, max(df_rank_all$Rank, na.rm = TRUE), by = 20)) +
     labs(x = "Species Rank", y = "Relative Abundance (log10)") +
@@ -159,16 +174,20 @@ ggsave("outputs/fig_rank_log.jpg", fig_rank_log, width = 8, height = 6)
 # Create iNEXT object ----------------------------------
 df_clean <- df %>%
     filter(!is.na(`Species Code`), !Code %in% c("R", "U")) %>%
+    mutate(Year = as.integer(YYYY), Month = as.integer(MM), Day = as.integer(DD)) %>%
+    semi_join(
+        df_abun_effort %>% mutate(Station = as.character(Station)),
+        by = c("Station", "Year", "Month", "Day")
+    ) %>%
     group_by(Station, `Species Code`) %>%
     summarise(count = n(), .groups = "drop")
 list_abundance <- df_clean %>%
-    group_split(Station) %>%
-    setNames(unique(df_clean$Station)) %>%
-    lapply(function(x) x$count)
+    group_split(Station)
+names(list_abundance) <- group_keys(group_by(df_clean, Station))$Station
+list_abundance <- lapply(list_abundance, function(x) x$count)
 list_inext_all <- iNEXT(list_abundance, q = 0, datatype = "abundance")
 df_inext_all <- fortify(list_inext_all, type = 1)
-vector_station_order <- c("BRL1", "FWC1", "CBS2", "RCR2", "TPPL")
-df_inext_all$Assemblage <- factor(df_inext_all$Assemblage, levels = vector_station_order, ordered = TRUE)
+df_inext_all$Assemblage <- factor(df_inext_all$Assemblage, levels = station_levels, ordered = TRUE)
 df_transition_points <- df_inext_all %>%
     filter(Method == "Extrapolation") %>%
     group_by(Assemblage) %>%
@@ -187,51 +206,50 @@ fig_rarefaction <- ggplot(df_inext_all, aes(x = x, y = y, color = Assemblage)) +
 ggsave("outputs/fig_rarefaction.jpg", fig_rarefaction, width = 8, height = 6)
 
 # Create species matrices ----------------------------------
-df_species_matrix <- df_species %>%
-    group_by(Station, `Species Code`) %>%
-    summarise(Total = sum(Count_Stand, na.rm = TRUE), .groups = "drop") %>%
-    pivot_wider(names_from = `Species Code`, values_from = Total, values_fill = 0) %>%
-    column_to_rownames(var = c("Station"))
-df_species_matrix_long <- df_species_matrix %>%
-    as.data.frame() %>%
-    rownames_to_column(var = "Station") %>%
-    pivot_longer(-Station, names_to = "Species", values_to = "Abundance")
+df_effort_season <- df_abun_effort %>%
+    mutate(Station = as.character(Station)) %>%
+    group_by(Station, Season) %>%
+    summarise(Effort = sum(Effort), .groups = "drop")
 df_species_matrix_alternate <- df_species %>%
-    filter(`Species Code` != "BADE" & `Species Code` != "BALO") %>%
     group_by(Station, Season, `Species Code`) %>%
-    summarise(Total = sum(Count_Stand, na.rm = TRUE), .groups = "drop") %>%
-    pivot_wider(names_from = `Species Code`, values_from = Total, values_fill = 0)
+    summarise(Total = sum(Count), .groups = "drop") %>%
+    left_join(df_effort_season, by = c("Station", "Season")) %>%
+    mutate(Abundance = Total / Effort * 50) %>%
+    select(Station, Season, `Species Code`, Abundance) %>%
+    pivot_wider(names_from = `Species Code`, values_from = Abundance, values_fill = 0)
 df_site_info <- df_species_matrix_alternate %>%
     select(Station, Season)
 matrix_community <- df_species_matrix_alternate %>%
     select(-Station, -Season) %>%
     as.matrix()
-rownames(matrix_community) <- df_site_info$Station
+rownames(matrix_community) <- paste(df_site_info$Station, df_site_info$Season)
+matrix_community_trans <- sqrt(matrix_community)
+dist_community <- vegdist(matrix_community_trans, method = "bray")
 
 # Create exclusive species table ----------------------------------
-table_exclusive_species <- df_species_matrix_long %>%
-    filter(Abundance > 0) %>%
-    group_by(Species) %>%
+table_exclusive_species <- df_species %>%
+    distinct(Station, `Species Code`) %>%
+    group_by(`Species Code`) %>%
     filter(n() == 1) %>%
     ungroup() %>%
     group_by(Station) %>%
-    summarise(`Exclusive Species` = paste(Species, collapse = ", "))
-write.csv(table_exclusive_species, "outputs/table_exclusive_species.csv")
+    summarise(`Exclusive Species` = paste(`Species Code`, collapse = ", "))
+write.csv(table_exclusive_species, "outputs/table_exclusive_species.csv", row.names = FALSE)
 
 # Run NMDS ----------------------------------
-mds_nmds <- metaMDS(matrix_community, distance = "bray", k = 2, trymax = 100)
+mds_nmds <- metaMDS(matrix_community_trans, distance = "bray", k = 2, trymax = 100, autotransform = FALSE)
 df_nmds_sites <- as.data.frame(scores(mds_nmds, display = "sites"))
 df_nmds_sites$Station <- df_site_info$Station
 df_nmds_sites$Season <- df_site_info$Season
 df_nmds_species <- as.data.frame(scores(mds_nmds, display = "species"))
 df_nmds_species$species <- rownames(df_nmds_species)
-mds_nmds$stress
+print(mds_nmds$stress)
 
 # Create NMDS centroid means table ----------------------------------
 df_nmds_sites_label <- df_nmds_sites %>%
     group_by(Station) %>%
     summarise(NMDS1 = mean(NMDS1), NMDS2 = mean(NMDS2))
-write.csv(df_nmds_sites_label, "outputs/table_centroid_means.csv")
+write.csv(df_nmds_sites_label, "outputs/table_centroid_means.csv", row.names = FALSE)
 
 # Create NMDS figure ----------------------------------
 fig_nmds <- ggplot(df_nmds_sites, aes(x = NMDS1, y = NMDS2, color = Station)) +
@@ -256,15 +274,19 @@ ggsave("outputs/fig_nmds_wide.jpg", fig_nmds, width = 14, height = 6)
 # Run PERMANOVA ----------------------------------
 df_site_info$Station <- as.factor(df_site_info$Station)
 df_site_info$Season <- as.factor(df_site_info$Season)
-permanova_community <- adonis2(
-    matrix_community ~ Station + Season,
+permanova_station <- adonis2(
+    dist_community ~ Station,
     data = df_site_info,
-    method = "bray",
-    permutations = 999
+    permutations = how(nperm = 999, blocks = df_site_info$Season)
 )
-permanova_community
-bd_station <- betadisper(
-    vegdist(matrix_community, method = "bray"),
-    df_site_info$Station
+print(permanova_station)
+permanova_season <- adonis2(
+    dist_community ~ Station + Season,
+    data = df_site_info,
+    permutations = how(nperm = 999, blocks = df_site_info$Station)
 )
-permutest(bd_station)
+print(permanova_season)
+
+# Run beta dispersion ----------------------------------
+bd_station <- betadisper(dist_community, df_site_info$Station)
+print(permutest(bd_station, permutations = 999))

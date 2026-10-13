@@ -5,10 +5,18 @@ source("helper_scripts/packages_attach.r")
 
 ## Load data ------------------------
 data_dir <- file.path("data")
-files <- list.files(data_dir, pattern = "^MoSI_.*\\.xlsx$", full.names = TRUE)
-files <- sort(files)
-df <- read_excel(files[1])
-df_effort <- read_excel(files[2])
+find_data_file <- function(pattern) {
+    matches <- list.files(data_dir, pattern = pattern, full.names = TRUE)
+    if (length(matches) != 1) {
+        stop(
+            "Expected exactly one file in '", data_dir, "' matching '", pattern,
+            "' but found ", length(matches), ": ", paste(basename(matches), collapse = ", ")
+        )
+    }
+    matches
+}
+df <- read_excel(find_data_file("^MoSI_Bird Banding Database.*\\.xlsx$"))
+df_effort <- read_excel(find_data_file("^MoSI_Bird Banding Effort.*\\.xlsx$"))
 
 ## Filter out TREEs ------------------------
 df <- df %>%
