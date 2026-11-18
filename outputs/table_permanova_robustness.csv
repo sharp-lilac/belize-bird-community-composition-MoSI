@@ -1,0 +1,12 @@
+"Check","Term","Df","SumOfSqs","R2","F","Pr(>F)"
+"Marginal terms (all stations)","Station",5,1.70366550975592,0.450852950715658,5.4573005977385,1e-04
+"Marginal terms (all stations)","Season",8,0.611578677630571,0.161846354126184,1.22440726476423,0.1112
+"Marginal terms (all stations)","Residual",17,1.06141537000372,0.280889792486137,NA,NA
+"Marginal terms (all stations)","Total",30,3.77876091761542,1,NA,NA
+"Marginal terms (CT excluded)","Station",4,1.3905960969104,0.435384535157358,6.10300941502876,1e-04
+"Marginal terms (CT excluded)","Season",8,0.579777087610967,0.181523577079803,1.27225476620034,0.0887
+"Marginal terms (CT excluded)","Residual",15,0.854453108096575,0.267522446027948,NA,NA
+"Marginal terms (CT excluded)","Total",27,3.19394922102091,1,NA,NA
+"Low-dispersion stations only (CBS2, TPPL, BRL1)","Station",2,0.776560819421008,0.545924789760534,8.4159483762798,1e-04
+"Low-dispersion stations only (CBS2, TPPL, BRL1)","Residual",14,0.645907685373655,0.454075210239466,NA,NA
+"Low-dispersion stations only (CBS2, TPPL, BRL1)","Total",16,1.42246850479466,1,NA,NA

@@ -282,3 +282,39 @@ write.csv(rownames_to_column(as.data.frame(permanova_community), "Term"), "outpu
 # Run beta dispersion ----------------------------------
 bd_station <- betadisper(dist_community, df_site_info$Station)
 print(permutest(bd_station, permutations = 9999))
+TukeyHSD(bd_station)$group
+
+# Carry out robustness checks for unequal dispersion ----------------------------------
+# Perform order-independent PERMANOVA
+permanova_margin <- adonis2(
+    dist_community ~ Station + Season,
+    data = df_site_info,
+    permutations = 9999,
+    by = "margin"
+)
+print(permanova_margin)
+# Drop data deficient site and redo PERMANOVA
+vec_keep_no_ct <- df_site_info$Station != "CT"
+dist_no_ct <- vegdist(matrix_community_trans[vec_keep_no_ct, ], method = "bray")
+df_site_info_no_ct <- droplevels(df_site_info[vec_keep_no_ct, ])
+permanova_no_ct <- adonis2(dist_no_ct ~ Station + Season, data = df_site_info_no_ct, permutations = 9999, by = "margin")
+print(permanova_no_ct)
+print(permutest(betadisper(dist_no_ct, df_site_info_no_ct$Station), permutations = 9999))
+# Redo PERMANOVA with only sites with homogenous dispersion
+vec_low_disp_stations <- c("CBS2", "TPPL", "BRL1")
+vec_keep_low <- df_site_info$Station %in% vec_low_disp_stations
+dist_low <- vegdist(matrix_community_trans[vec_keep_low, ], method = "bray")
+df_site_info_low <- droplevels(df_site_info[vec_keep_low, ])
+print(permutest(betadisper(dist_low, df_site_info_low$Station), permutations = 9999))
+permanova_low <- adonis2(dist_low ~ Station, data = df_site_info_low, permutations = 9999)
+print(permanova_low)
+# Organize robustness checks in table
+fn_tidy_perm <- function(x, check) {
+    rownames_to_column(as.data.frame(x), "Term") %>% mutate(Check = check, .before = 1)
+}
+table_robustness <- bind_rows(
+    fn_tidy_perm(permanova_margin, "Marginal terms (all stations)"),
+    fn_tidy_perm(permanova_no_ct, "Marginal terms (CT excluded)"),
+    fn_tidy_perm(permanova_low, "Low-dispersion stations only (CBS2, TPPL, BRL1)")
+)
+write.csv(table_robustness, "outputs/table_permanova_robustness.csv", row.names = FALSE)
