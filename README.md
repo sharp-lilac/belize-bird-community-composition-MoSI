@@ -4,7 +4,7 @@ The purpose of this repository is to store the R code for running the analyses a
 
 To run the code you will need MoSI Bird Banding Data, and MoSI Bird Banding Effort Data. The data are stored by the University of Belize Environmental Research Institute (UB-ERI). Inquiries about data availability may be directed to Abidas Ash, Avian Biologist, UB-ERI.
 
-License is provided in ``LICENSE.txt``, and citation is provided in `citation.CFF`. DOI: 10.5281/zenodo.23352444
+License is provided in ``LICENSE.txt``, and citation is provided in `citation.CFF`. DOI: 10.5281/zenodo.1780611
 
 #### Using the Repository
 
